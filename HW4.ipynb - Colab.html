@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Random Walk (3D Projection with Z Color)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #controls { margin-bottom: 20px; }
+    #canvas { background-color: #e0f7ff; border: 1px solid #aaa; }
+    button { padding: 8px 16px; margin-right: 10px; }
+    input { width: 80px; }
+  </style>
+</head>
+<body>
+  <h2>3D Random Walk (3D Projection with Z-Color)</h2>
+  <div id="controls">
+    Number of Steps:
+    <input type="number" id="stepsInput" value="5000" min="100" max="20000" step="100">
+    <button onclick="startSimulation()">Start Simulation</button>
+    <button onclick="stopSimulation()">Stop Simulation</button>
+    <div id="status"></div>
+  </div>
+  <canvas id="canvas" width="600" height="600"></canvas>
+
+  <script>
+    // --- Settings ---
+    const cageMin = -10;
+    const cageMax = 10;
+    const canvasSize = 600;
+    const scale = canvasSize / (2 * (cageMax + 1));
+
+    // --- State Variables ---
+    let ctx;
+    let running = false;
+    let stepCount = 0;
+    let maxSteps = 5000;
+    let position = { x: 0, y: 0, z: 0 };
+    let prevPosition = { x: 0, y: 0, z: 0 };
+    let hasLeftOrigin = false;
+    let hasReturned = false;
+
+    // --- Utility Functions ---
+    function clamp(v) {
+      return Math.max(cageMin, Math.min(cageMax, v));
+    }
+
+    function step() {
+      const r = Math.random();
+      if (r < 1/6) return { dx: 1, dy: 0, dz: 0 };
+      else if (r < 2/6) return { dx: -1, dy: 0, dz: 0 };
+      else if (r < 3/6) return { dx: 0, dy: 1, dz: 0 };
+      else if (r < 4/6) return { dx: 0, dy: -1, dz: 0 };
+      else if (r < 5/6) return { dx: 0, dy: 0, dz: 1 };
+      else return { dx: 0, dy: 0, dz: -1 };
+    }
+
+    function coordToCanvas(x, y) {
+      return {
+        cx: canvasSize / 2 + x * scale,
+        cy: canvasSize / 2 - y * scale
+      };
+    }
+
+    function zToColor(z) {
+      const ratio = (z - cageMin) / (cageMax - cageMin);
+      const r = Math.floor(ratio * 255);
+      const b = 255 - r;
+      return ⁠ rgb(${r},0,${b}) ⁠;
+    }
+
+    function drawLine(x1, y1, x2, y2, color) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function markReturnPoint(x, y) {
+      const p = coordToCanvas(x, y);
+      ctx.beginPath();
+      ctx.arc(p.cx, p.cy, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = 'red';
+      ctx.fill();
+    }
+
+    async function runWalk() {
+      while (running && stepCount < maxSteps) {
+        prevPosition = { ...position };
+
+        const { dx, dy, dz } = step();
+        position.x = clamp(position.x + dx);
+        position.y = clamp(position.y + dy);
+        position.z = clamp(position.z + dz);
+
+        if (!hasLeftOrigin && (position.x !== 0 || position.y !== 0 || position.z !== 0)) {
+          hasLeftOrigin = true;
+        }
+
+        if (hasLeftOrigin && !hasReturned && position.x === 0 && position.y === 0 && position.z === 0) {
+          hasReturned = true;
+          markReturnPoint(position.x, position.y);
+          document.getElementById('status').textContent += ' | RETURNED TO ORIGIN!';
+        }
+
+        const p1 = coordToCanvas(prevPosition.x, prevPosition.y);
+        const p2 = coordToCanvas(position.x, position.y);
+        const color = zToColor(position.z);
+        drawLine(p1.cx, p1.cy, p2.cx, p2.cy, color);
+
+        stepCount++;
+        document.getElementById('status').textContent =
+          ⁠ Steps: ${maxSteps} | Current Step: ${stepCount} | Position: (${position.x}, ${position.y}, ${position.z}) ⁠
+          + (hasReturned ? ' | RETURNED TO ORIGIN!' : '');
+
+        await sleep(1);
+      }
+      running = false;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function startSimulation() {
+      if (running) return;
+      running = true;
+
+      ctx = document.getElementById('canvas').getContext('2d');
+      ctx.fillStyle = '#e0f7ff';
+      ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+      stepCount = 0;
+      maxSteps = parseInt(document.getElementById('stepsInput').value);
+      position = { x: 0, y: 0, z: 0 };
+      prevPosition = { x: 0, y: 0, z: 0 };
+      hasLeftOrigin = false;
+      hasReturned = false;
+
+      document.getElementById('status').textContent = ⁠ Steps: ${maxSteps} | Current Step: 0 | Position: (0, 0, 0) ⁠;
+
+      runWalk();
+    }
+
+    function stopSimulation() {
+      running = false;
+      document.getElementById('status').textContent += ' | Stopped';
+    }
+  </script>
+</body>
+</html>
